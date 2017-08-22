@@ -10,9 +10,71 @@
 
 #define EVENT_BUFFER_SIZE   PAGE_SIZE
 
-static void dwc_handle_event(dwc3_t* dwc, uint32_t event) {
+static void dwc_handle_ep_event(dwc3_t* dwc, dwc3_event event) {
+    printf("dwc_handle_ep_event 0x%08X\n", event);
+
+}
+
+static void dwc_handle_event(dwc3_t* dwc, dwc3_event event) {
     printf("dwc_handle_event 0x%08X\n", event);
 
+    if (!(event & DEPEVT_NON_EP)) {
+        dwc_handle_ep_event(dwc, event);
+        return;
+    }
+
+    uint32_t event_type = (event & DWC3_MASK(DEVT_EVENT_TYPE_START, DEVT_EVENT_TYPE_BITS)) >> DEVT_EVENT_TYPE_START;
+
+    switch (event_type) {
+    case DEVT_DISCONNECT:
+        printf("DEVT_DISCONNECT\n");
+        break;
+    case DEVT_USB_RESET:
+        printf("DEVT_USB_RESET\n");
+        break;
+    case DEVT_CONNECTION_DONE:
+        printf("DEVT_CONNECTION_DONE\n");
+        break;
+    case DEVT_LINK_STATE_CHANGE:
+        printf("DEVT_LINK_STATE_CHANGE\n");
+        break;
+    case DEVT_REMOTE_WAKEUP:
+        printf("DEVT_REMOTE_WAKEUP\n");
+        break;
+    case DEVT_HIBERNATE_REQUEST:
+        printf("DEVT_HIBERNATE_REQUEST\n");
+        break;
+    case DEVT_SUSPEND_ENTRY:
+        printf("DEVT_SUSPEND_ENTRY\n");
+        break;
+    case DEVT_SOF:
+        printf("DEVT_SOF\n");
+        break;
+    case DEVT_ERRATIC_ERROR:
+        printf("DEVT_ERRATIC_ERROR\n");
+        break;
+    case DEVT_COMMAND_COMPLETE:
+        printf("DEVT_COMMAND_COMPLETE\n");
+        break;
+    case DEVT_EVENT_BUF_OVERFLOW:
+        printf("DEVT_EVENT_BUF_OVERFLOW\n");
+        break;
+    case DEVT_VENDOR_TEST_LMP:
+        printf("DEVT_VENDOR_TEST_LMP\n");
+        break;
+    case DEVT_STOPPED_DISCONNECT:
+        printf("DEVT_STOPPED_DISCONNECT\n");
+        break;
+    case DEVT_L1_RESUME_DETECT:
+        printf("DEVT_L1_RESUME_DETECT\n");
+        break;
+    case DEVT_LDM_RESPONSE:
+        printf("DEVT_LDM_RESPONSE\n");
+        break;
+    default:
+        printf("unknown event_type %u\n", event_type);
+        break;
+    }
 }
 
 static int dwc_irq_thread(void* arg) {
@@ -29,10 +91,9 @@ printf("dwc_irq_thread start\n");
  
     DWC3_WRITE32(mmio + GEVNTSIZ(0), EVENT_BUFFER_SIZE | GEVNTSIZ_EVNTINTRPTMASK);
 
-
-    uint32_t* ring_start = io_buffer_virt(&dwc->event_buffer);
-    uint32_t* ring_cur = ring_start;
-    uint32_t* ring_end = (void *)ring_start + EVENT_BUFFER_SIZE;
+    dwc3_event* ring_start = io_buffer_virt(&dwc->event_buffer);
+    dwc3_event* ring_cur = ring_start;
+    dwc3_event* ring_end = (void *)ring_start + EVENT_BUFFER_SIZE;
 
     // enable events
     uint32_t event_mask = DEVTEN_ULSTCNGEN | \
@@ -56,7 +117,7 @@ printf("dwc_irq_thread start\n");
         uint32_t event_count = DWC3_READ32(mmio + GEVNTCOUNT(0)) & GEVNTCOUNT_EVNTCOUNT_MASK;
 
         for (unsigned i = 0; i < event_count; i += sizeof(uint32_t)) {
-            uint32_t event = *ring_cur++;
+            dwc3_event event = *ring_cur++;
             if (ring_cur == ring_end) {
                 ring_cur = ring_start;
             }
